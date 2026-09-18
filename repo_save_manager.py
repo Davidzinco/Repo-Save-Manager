@@ -18,6 +18,7 @@ import io
 import platform
 from lib.linux_paths import find_linux_saves, xdg_path
 from lib.import_save import import_es3
+from lib.save_stats import stage_from_level, level_from_stage
 from lib.save_paths import game_saves, save_files, copy_to_directory, game_destination, remove_save, restore_save, save_modified
 
 # Get the application directory for resource paths
@@ -265,8 +266,8 @@ class SaveEditor(QDialog):
     def create_world_tab(self):
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        self.level_entry = self.create_entry("Saved level (raw):", layout)
-        self.level_entry.setToolTip("Value stored in the save file; may differ from the current stage shown in game.")
+        self.level_entry = self.create_entry("Stage:", layout)
+        self.level_entry.setToolTip("Stage = completed levels + 1. The save stores the completed-level count.")
         self.currency_entry = self.create_entry("Currency:", layout)
         self.lives_entry = self.create_entry("Lives:", layout)
         self.charging_entry = self.create_entry("Charging Station Charge:", layout)
@@ -408,7 +409,7 @@ class SaveEditor(QDialog):
             
             # --- Populate World Tab --- 
             run_stats = self.json_data.get('dictionaryOfDictionaries', {}).get('value', {}).get('runStats', {})
-            self.level_entry.setText(str(run_stats.get('level', 0)))
+            self.level_entry.setText(str(stage_from_level(run_stats.get('level', 0))))
             self.currency_entry.setText(str(run_stats.get('currency', 0)))
             self.lives_entry.setText(str(run_stats.get('lives', 0)))
             self.charging_entry.setText(str(run_stats.get('chargingStationCharge', 0)))
@@ -528,8 +529,11 @@ class SaveEditor(QDialog):
             # --- Update JSON from World Tab --- 
             # Use temporary dict for runStats updates
             run_stats_update = {}
-            try: run_stats_update['level'] = int(self.level_entry.text()) 
-            except ValueError: print("Invalid value for Level")
+            try:
+                run_stats_update['level'] = level_from_stage(self.level_entry.text())
+            except ValueError:
+                QMessageBox.warning(self, "Invalid stage", "Enter a whole stage number of at least 1.")
+                return
             try: run_stats_update['currency'] = int(self.currency_entry.text())
             except ValueError: print("Invalid value for Currency")
             try: run_stats_update['lives'] = int(self.lives_entry.text())
@@ -1175,7 +1179,7 @@ class RepoSaveManager(QMainWindow):
         self.save_table.files_dropped.connect(self.import_save_files)
         # Columns: Save Name, Type, Players, Notes, Day, Last Modified
         self.save_table.setColumnCount(6) 
-        self.save_table.setHorizontalHeaderLabels(["Save Name", "Type", "Players", "Notes", "Saved level", "Last Saved"])
+        self.save_table.setHorizontalHeaderLabels(["Save Name", "Type", "Players", "Notes", "Stage", "Last Saved"])
         # Make columns resizable by user
         self.save_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         # Set initial column widths but allow resizing
@@ -1409,7 +1413,7 @@ class RepoSaveManager(QMainWindow):
                         player_names_dict = json_data.get("playerNames", {}).get("value", {}) # Get names dict
                         player_ids = list(player_names_dict.keys()) # Get IDs for PFP fetching
                         
-                        day_str = str(run_stats.get('level', 'N/A'))
+                        day_str = str(stage_from_level(run_stats['level'])) if 'level' in run_stats else 'N/A'
                     else:
                         print(f"Warning: No .es3 file found in {save_info['name']}")
                         
@@ -1454,7 +1458,7 @@ class RepoSaveManager(QMainWindow):
                 
                 # --- Column 4: Day --- 
                 day_item = QTableWidgetItem(day_str)
-                day_item.setToolTip("Raw level in the saved file; not live game memory.")
+                day_item.setToolTip("Stage = completed levels in the save + 1. Updated when the game saves.")
                 day_item.setFlags(day_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 day_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter) # Center vertically AND horizontally
                 self.save_table.setItem(row, 4, day_item) # Set item at column 4

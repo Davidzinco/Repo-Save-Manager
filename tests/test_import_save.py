@@ -100,7 +100,7 @@ class DropIntegrationTests(unittest.TestCase):
             warning.assert_called_once()
         self.assertEqual(source.read_bytes(), data)
         self.assertEqual(window.save_table.rowCount(), 1)
-        self.assertEqual(window.save_table.item(0, 4).text(), '7')
+        self.assertEqual(window.save_table.item(0, 4).text(), '8')
         self.assertTrue(window.get_selected_save_info()['is_backup'])
         self.assertTrue(window.restore_btn.isEnabled())
         self.assertTrue(window.settings['show_backup_saves'])
@@ -174,18 +174,34 @@ class DropIntegrationTests(unittest.TestCase):
             window.apply_save_path()
             window.refresh_save_list()
             self.assertEqual(window.save_table.rowCount(), 1)
-            self.assertEqual(window.save_table.item(0, 4).text(), '5')
+            self.assertEqual(window.save_table.item(0, 4).text(), '6')
             window.save_table.selectRow(0)
             self.assertFalse(window.edit_button.isEnabled())
             primary.write_bytes(payload(6, 9))
             window.refresh_if_changed()
-            self.assertEqual(window.save_table.item(0, 4).text(), '6')
+            self.assertEqual(window.save_table.item(0, 4).text(), '7')
             self.assertEqual(window.get_selected_save_info()['path'], str(folder))
             from lib.save_paths import save_files
             editor = SaveEditor(str(save_files(folder)[0]), window)
             self.addCleanup(editor.close)
-            self.assertEqual(editor.level_entry.text(), '6')
+            self.assertEqual(editor.level_entry.text(), '7')
             self.assertEqual(editor.charging_entry.text(), '9')
+            from lib.decrypt import decrypt_es3
+            with patch('repo_save_manager.QMessageBox.information'):
+                editor.save_changes()
+            saved = json.loads(decrypt_es3(primary.read_bytes(), SAVE_PASSWORD))
+            self.assertEqual(saved['dictionaryOfDictionaries']['value']['runStats']['level'], 6)
+            editor.level_entry.setText('8')
+            with patch('repo_save_manager.QMessageBox.information'):
+                editor.save_changes()
+            saved = json.loads(decrypt_es3(primary.read_bytes(), SAVE_PASSWORD))
+            self.assertEqual(saved['dictionaryOfDictionaries']['value']['runStats']['level'], 7)
+            before = primary.read_bytes()
+            editor.level_entry.setText('0')
+            with patch('repo_save_manager.QMessageBox.warning') as warning:
+                editor.save_changes()
+                warning.assert_called_once()
+            self.assertEqual(primary.read_bytes(), before)
             self.assertFalse(window.descriptions_file.exists())
 
     def test_non_save_and_remote_urls_rejected(self):

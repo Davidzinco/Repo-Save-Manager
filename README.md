@@ -87,8 +87,10 @@ The **In-Game** rows show the main save file on disk and refresh automatically
 (every three seconds when no dialog or note editor is open). **Refresh** reloads
 it manually. Backup rows remain snapshots; use **Backup Save** again to update
 an existing backup. Game recovery files (`_BACKUP*.es3`) are never selected in
-place of the main save. **Saved level** shows the raw value stored in the file,
-which may differ from the stage currently displayed in the running game.
+place of the main save. **Stage** matches the game's numbering: `runStats.level` counts completed
+stages, so a stored value of `6` means stage `7`. The World editor converts stage
+numbers back to completed levels when saving; Advanced JSON retains the raw
+value. Creating a backup copies the save bytes without changing this counter.
 Viewing game saves does not require enabling Live Edits.
 
 ### Restoring Saves
